@@ -50,11 +50,12 @@ async function verify() {
     await remote.waitForTimeout(500);
     await selectAll();
     const seed = '远程复制 ' + Date.now() + '\nsecond line ';
-    await context.grantPermissions(['clipboard-read', 'clipboard-write'], {origin: new URL(remote.url()).origin});
-    await remote.evaluate(text => navigator.clipboard.writeText(text), seed);
-    await remote.keyboard.press('Control+v', {delay: 100});
-    await remote.waitForTimeout(2000);
-    await context.clearPermissions();
+    await canvas.evaluate(async (element, text) => {
+      const transport = element.getRootNode().host.$server;
+      await transport.offerText(text);
+      await transport.pasteShortcut();
+    }, seed);
+    await remote.waitForTimeout(1400);
     for (const suffix of ['1', '2']) {
       await remote.bringToFront();
       await canvas.focus();
