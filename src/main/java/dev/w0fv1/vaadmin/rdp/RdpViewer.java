@@ -89,6 +89,8 @@ public final class RdpViewer extends Component {
 
     @ClientCallable public void pasteShortcut() { forward(RdpSession::pasteShortcut); }
 
+    @ClientCallable public void copyShortcut(boolean rightControl) { forward(s -> s.copyShortcut(rightControl)); }
+
 
     @Override protected void onDetach(DetachEvent event) {
         disconnect();

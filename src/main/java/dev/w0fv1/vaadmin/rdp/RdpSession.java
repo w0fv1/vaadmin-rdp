@@ -109,13 +109,24 @@ public final class RdpSession implements AutoCloseable {
     }
 
     public void pasteShortcut() throws IOException {
-        var events = DesktopActivation.buffer(52).putShort((short) 4).putShort((short) 0);
+        shortcut(42, false, 82, true, true);
+    }
+
+    public void copyShortcut(boolean rightControl) throws IOException {
+        shortcut(29, rightControl, 46, false, false);
+    }
+
+    private void shortcut(int modifier, boolean extendedModifier, int key, boolean extendedKey,
+                          boolean releaseModifier) throws IOException {
+        int count = releaseModifier ? 4 : 3;
+        var events = DesktopActivation.buffer(4 + count * 12).putShort((short) count).putShort((short) 0);
         int timestamp = (int) System.currentTimeMillis();
-        int[] codes = {42, 82, 82, 42};
-        for (int i = 0; i < codes.length; i++) {
-            int flags = (i < 2 ? 0 : 0x8000) | (codes[i] == 82 ? 0x100 : 0);
+        for (int i = 0; i < count; i++) {
+            boolean isModifier = i == 0 || i == 3;
+            boolean extended = isModifier ? extendedModifier : extendedKey;
+            int flags = (i < 2 ? 0 : 0x8000) | (extended ? 0x100 : 0);
             events.putInt(timestamp + i).putShort((short) 4).putShort((short) flags)
-                    .putShort((short) codes[i]).putShort((short) 0);
+                    .putShort((short) (isModifier ? modifier : key)).putShort((short) 0);
         }
         activation.data(28, events.array());
     }

@@ -24,7 +24,7 @@ Java 21 / Vaadin Flow 的 Windows 远程桌面组件。JVM 直接通过 TLS 和 
 
 ## 真机复制验收
 
-在装有 Edge 和 Node.js 的 Windows 测试机上启动示例，配置 `VAADMIN_TEST_PROFILE`、`VAADMIN_TEST_USER` 和 `VAADMIN_TEST_PASS`。自签名服务器还需配置 `RDP_TEST_SERVER_PIN`。示例地址可通过 `VAADMIN_SAMPLE_URL` 指定。使用专用 Windows 测试会话，验收会打开远程记事本并使用本机剪贴板。
+在装有 Edge 和 Node.js 的 Windows 测试机上启动示例，配置 `VAADMIN_TEST_PROFILE`、`VAADMIN_TEST_USER` 和 `VAADMIN_TEST_PASS`。自签名服务器还需配置 `RDP_TEST_SERVER_PIN`。示例地址可通过 `VAADMIN_SAMPLE_URL` 指定。在专用 Windows 测试会话中打开并最大化一个空白记事本。验收会在这个文档中输入测试文本，并使用本机剪贴板。
 
 ```powershell
 npm install --no-save --package-lock=false playwright

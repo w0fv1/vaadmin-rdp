@@ -17,6 +17,7 @@ async function verify() {
       await local.waitForFunction(value => document.querySelector('textarea').value === value, expected, {timeout: 4000});
     };
     const remote = await context.newPage();
+    remote.setDefaultTimeout(20000);
     await remote.goto(process.env.VAADMIN_SAMPLE_URL || 'http://localhost:8080');
     await remote.locator('input[type=file]').setInputFiles(VAADMIN_TEST_PROFILE);
     await remote.getByText('已导入连接地址与桌面尺寸', {exact: false}).waitFor();
@@ -27,34 +28,40 @@ async function verify() {
     }
     await remote.getByRole('button', {name: '连接', exact: true}).click();
     const canvas = remote.locator('vaadmin-rdp-viewer canvas');
+    const selectAll = async () => {
+      await remote.keyboard.down('Control');
+      await remote.waitForTimeout(180);
+      await remote.keyboard.press('a', {delay: 120});
+      await remote.keyboard.up('Control');
+      await remote.waitForTimeout(500);
+    };
     await canvas.waitFor({state: 'visible'});
     await remote.waitForFunction(() => {
       const c = document.querySelector('vaadmin-rdp-viewer').shadowRoot.querySelector('canvas');
-      return c.getContext('2d').getImageData(0, 0, 160, 120).data.some((v, i) => i % 4 !== 3 && v > 40);
-    });
-    await remote.waitForTimeout(2500);
+      const taskbar = c.getContext('2d').getImageData(0, c.height - 38, 150, 38).data;
+      return taskbar.some((red, i) => i % 4 === 0 && red > 220 && taskbar[i + 1] > 220 && taskbar[i + 2] > 220);
+    }, null, {timeout: 45000});
+    await canvas.scrollIntoViewIfNeeded();
+    await remote.bringToFront();
     await canvas.focus();
-    await remote.keyboard.press('Meta+r', {delay: 90});
-    await remote.waitForTimeout(1200);
-    await remote.keyboard.press('Control+a');
-    for (const key of 'notepad') await remote.keyboard.press(key, {delay: 70});
-    await remote.keyboard.press('Enter');
-    await remote.waitForTimeout(1600);
-
+    await remote.keyboard.press('Escape', {delay: 120});
+    await remote.waitForTimeout(1000);
+    await canvas.click();
+    await remote.waitForTimeout(500);
+    await selectAll();
     const seed = '远程复制 ' + Date.now() + '\nsecond line ';
     await context.grantPermissions(['clipboard-read', 'clipboard-write'], {origin: new URL(remote.url()).origin});
     await remote.evaluate(text => navigator.clipboard.writeText(text), seed);
-    await remote.getByRole('button', {name: '复制到远端剪贴板'}).click();
-    await remote.getByText('远端剪贴板已就绪，可按 Shift+Insert 粘贴').waitFor();
-    await remote.keyboard.press('Shift+Insert', {delay: 100});
-    await remote.waitForTimeout(600);
+    await remote.keyboard.press('Control+v', {delay: 100});
+    await remote.waitForTimeout(2000);
     await context.clearPermissions();
     for (const suffix of ['1', '2']) {
       await remote.bringToFront();
       await canvas.focus();
-      await remote.keyboard.press('Control+End');
+      await remote.keyboard.press('Control+End', {delay: 100});
+      await remote.waitForTimeout(550);
       await remote.keyboard.press('Digit' + suffix, {delay: 100});
-      await remote.keyboard.press('Control+a');
+      await selectAll();
       await remote.keyboard.press('Control+c', {delay: 90});
       await remote.getByText('已复制到本机剪贴板', {exact: true}).waitFor({timeout: 12000});
       await pasteLocally(seed + (suffix === '1' ? '1' : '12'));
@@ -63,9 +70,10 @@ async function verify() {
     await remote.bringToFront();
     await canvas.focus();
     await context.grantPermissions(['clipboard-read'], {origin: new URL(remote.url()).origin});
-    await remote.keyboard.press('Control+End');
+    await remote.keyboard.press('Control+End', {delay: 100});
+    await remote.waitForTimeout(550);
     await remote.keyboard.press('Digit3', {delay: 100});
-    await remote.keyboard.press('Control+a');
+    await selectAll();
     await remote.keyboard.press('Control+c', {delay: 90});
     await remote.getByText('远端文本已就绪，请点「复制远端文本」').waitFor();
     await context.clearPermissions();

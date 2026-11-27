@@ -68,10 +68,14 @@ class VaadminRdpViewer extends HTMLElement {
   }
 
   keyboard(e,down) {
-    if (down && e.code === 'KeyC' && e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+    if (e.code === 'KeyC' && e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
       e.preventDefault();
-      if (e.repeat || this.pendingCopy) return;
+      if (!down || e.repeat || this.pendingCopy) return;
       this.copySelection();
+      const rightControl = this.keys.has('ControlRight');
+      this.keys.add(rightControl ? 'ControlRight' : 'ControlLeft');
+      this.$server.copyShortcut(rightControl);
+      return;
     }
     if (e.code==='KeyV' && (e.ctrlKey||e.metaKey)) {
       if (!navigator.clipboard?.readText) return;
