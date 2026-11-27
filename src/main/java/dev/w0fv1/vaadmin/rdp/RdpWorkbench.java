@@ -30,15 +30,7 @@ public final class RdpWorkbench extends VerticalLayout {
         fields.setWrap(true);
         var upload = new Upload(UploadHandler.inMemory((metadata, bytes) -> {
             try {
-                var profile = RdpProfile.parse(bytes);
-                host.setValue(profile.host());
-                port.setValue(profile.port());
-                user.setValue(profile.username());
-                domain.setValue(profile.domain());
-                password.clear();
-                fingerprint.clear();
-                width = profile.width();
-                height = profile.height();
+                loadProfile(RdpProfile.parse(bytes), null);
                 notice.setText("已导入连接地址与桌面尺寸，证书按连接时的信任设置验证。");
             } catch (IllegalArgumentException e) { notice.setText(e.getMessage()); }
         }));
@@ -61,9 +53,28 @@ public final class RdpWorkbench extends VerticalLayout {
             }
             var profile = new RdpProfile(host.getValue().strip(), port.getValue(), user.getValue(),
                     domain.getValue(), width, height);
-            viewer.connect(profile, password.getValue(), RdpTrust.context(fingerprint.getValue()));
-            password.clear();
-            notice.setText("");
+            connect(profile, password.getValue(), fingerprint.getValue());
         } catch (Exception e) { notice.setText(e.getMessage()); }
+    }
+
+    public void connect(RdpProfile profile, String secret, String sha256) {
+        loadProfile(profile, sha256);
+        try {
+            viewer.connect(profile, secret, RdpTrust.context(sha256));
+            notice.setText("");
+        } catch (java.security.GeneralSecurityException | IllegalArgumentException e) {
+            notice.setText(e.getMessage());
+        }
+    }
+
+    private void loadProfile(RdpProfile profile, String sha256) {
+        host.setValue(profile.host());
+        port.setValue(profile.port());
+        user.setValue(profile.username());
+        domain.setValue(profile.domain() == null ? "" : profile.domain());
+        fingerprint.setValue(sha256 == null ? "" : sha256);
+        password.clear();
+        width = profile.width();
+        height = profile.height();
     }
 }
