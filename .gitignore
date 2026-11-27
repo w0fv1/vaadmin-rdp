@@ -1,0 +1,13 @@
+.gradle/
+build/
+target/
+out/
+node_modules/
+.tmp/
+*.log
+sample/src/main/frontend/generated/
+sample/src/main/bundles/
+sample/vite.generated.ts
+sample/.vaadin-node-tasks.lock
+.playwright-cli/
+test-results/
