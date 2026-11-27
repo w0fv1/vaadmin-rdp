@@ -5,6 +5,16 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class TextClipboardTest {
+    @Test void clearsUnavailableRemoteTextInsteadOfRetainingEarlierSelection() throws Exception {
+        var received = new ArrayList<String>();
+        var clipboard = new TextClipboard(ignored -> {}, received::add);
+        var hex = java.util.HexFormat.of();
+        clipboard.receive(hex.parseHex("0c00000003000000050001000400000041000000"));
+        clipboard.receive(hex.parseHex("08000000030000000200000000000000"));
+        clipboard.receive(hex.parseHex("08000000030000000500020000000000"));
+        assertEquals(List.of("A", "", ""), received);
+    }
+
     @Test void movesUnicodeBetweenPeersWithoutSharingSessionState() throws Exception {
         var aToB = new ArrayDeque<byte[]>();
         var bToA = new ArrayDeque<byte[]>();

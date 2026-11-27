@@ -13,10 +13,18 @@ class VaadminRdpViewer extends HTMLElement {
     this.canvas = root.querySelector('canvas');
     this.status = root.querySelector('[role=status]');
     this.buttons = [...root.querySelectorAll('button')];
+    this.buttons[0].disabled = true;
     this.buttons[0].onclick = async () => {
+      const generation = this.generation;
       this.setStatus("正在复制远端文本");
-      try { await navigator.clipboard.writeText(this.remoteText); this.canvas.focus({preventScroll:true}); this.setStatus("已复制到本机剪贴板"); }
-      catch { this.setStatus('浏览器未允许写入剪贴板'); }
+      try {
+        await navigator.clipboard.writeText(this.remoteText);
+        if (generation !== this.generation) return;
+        this.canvas.focus({preventScroll:true});
+        this.setStatus("已复制到本机剪贴板");
+      } catch {
+        if (generation === this.generation) this.setStatus('浏览器未允许写入剪贴板');
+      }
     };
     this.buttons[1].onclick = async () => {
       this.setStatus("正在更新远端剪贴板");
@@ -60,6 +68,11 @@ class VaadminRdpViewer extends HTMLElement {
   }
 
   keyboard(e,down) {
+    if (down && e.code === 'KeyC' && e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+      e.preventDefault();
+      if (e.repeat || this.pendingCopy) return;
+      this.copySelection();
+    }
     if (e.code==='KeyV' && (e.ctrlKey||e.metaKey)) {
       if (!navigator.clipboard?.readText) return;
       e.preventDefault();
@@ -87,7 +100,37 @@ class VaadminRdpViewer extends HTMLElement {
     this.$server.pointer(flags,x,y);
   }
 
-  setRemoteText(text) { this.remoteText = text; }
+  async copySelection() {
+    const request = {};
+    const text = new Promise((resolve, reject) => Object.assign(request, {resolve, reject}));
+    this.pendingCopy = request;
+    this.remoteText = "";
+    this.buttons[0].disabled = true;
+    this.setStatus('正在等待远端选区');
+    const timeout = setTimeout(() => request.reject(new Error('远端未返回文本，请重新选中后复制')), 8000);
+    try {
+      const clipboard = navigator.clipboard;
+      const write = clipboard?.write && typeof ClipboardItem === 'function'
+        ? clipboard.write([new ClipboardItem({'text/plain': text.then(value => new Blob([value], {type:'text/plain'}))})])
+        : text.then(value => clipboard.writeText(value));
+      const [, written] = await Promise.all([text, write.then(() => true, () => false)]);
+      if (this.pendingCopy === request) {
+        this.setStatus(written ? '已复制到本机剪贴板' : '远端文本已就绪，请点「复制远端文本」');
+      }
+    } catch (error) {
+      if (this.pendingCopy === request) this.setStatus(error.message);
+    } finally {
+      clearTimeout(timeout);
+      if (this.pendingCopy === request) this.pendingCopy = null;
+    }
+  }
+
+  setRemoteText(text) {
+    this.remoteText = text;
+    this.buttons[0].disabled = !text;
+    if (text) this.pendingCopy?.resolve(text);
+    else this.pendingCopy?.reject(new Error('远端剪贴板中没有文本'));
+  }
 
   setStatus(text) { this.status.textContent=text; }
 
@@ -119,6 +162,9 @@ class VaadminRdpViewer extends HTMLElement {
   }
 
   closeDesktop() {
+    this.pendingCopy?.reject(new Error('已断开'));
+    this.pendingCopy = null;
+    this.buttons[0].disabled = true;
     this.generation++;clearTimeout(this.timer);this.keys.clear();this.remoteText="";
     this.canvas.hidden=true;this.buttons.forEach(button=>button.hidden=true);
     this.setStatus('已断开');

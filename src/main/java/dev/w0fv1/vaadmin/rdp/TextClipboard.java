@@ -64,6 +64,7 @@ final class TextClipboard {
                 if (message.hasRemaining()) throw new IOException("Invalid clipboard format list");
                 send(3, 1, new byte[0]);
                 if (unicode) send(4, 0, buffer(4).putInt(13).array());
+                else remote.accept("");
             }
             case 3 -> {
                 var pending = announcements.poll();
@@ -84,7 +85,7 @@ final class TextClipboard {
                     String text = StandardCharsets.UTF_16LE.decode(message).toString();
                     int end = text.indexOf('\0');
                     remote.accept((end < 0 ? text : text.substring(0, end)).replace("\r\n", "\n"));
-                }
+                } else remote.accept("");
             }
             default -> {}
         }
