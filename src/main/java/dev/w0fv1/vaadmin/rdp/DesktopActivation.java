@@ -110,10 +110,3 @@ final class DesktopActivation {
         return Arrays.copyOf(data.array(), data.position());
     }
 }
-
-
-
-
-
-
-

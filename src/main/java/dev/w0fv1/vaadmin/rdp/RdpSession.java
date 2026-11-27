@@ -108,7 +108,28 @@ public final class RdpSession implements AutoCloseable {
                 .putShort((short) type).putShort((short) flags).putShort((short) first).putShort((short) second).array());
     }
 
-    public void offerText(String text) throws IOException { clipboard.offer(text); }
+    public void pasteShortcut() throws IOException {
+        var events = DesktopActivation.buffer(52).putShort((short) 4).putShort((short) 0);
+        int timestamp = (int) System.currentTimeMillis();
+        int[] codes = {42, 82, 82, 42};
+        for (int i = 0; i < codes.length; i++) {
+            int flags = (i < 2 ? 0 : 0x8000) | (codes[i] == 82 ? 0x100 : 0);
+            events.putInt(timestamp + i).putShort((short) 4).putShort((short) flags)
+                    .putShort((short) codes[i]).putShort((short) 0);
+        }
+        activation.data(28, events.array());
+    }
+
+    public void offerText(String text) throws IOException {
+        try {
+            clipboard.offer(text).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Clipboard interrupted", e);
+        } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+            throw new IOException("Remote clipboard unavailable", e);
+        }
+    }
 
     @Override public void close() {
         closed = true;

@@ -13,6 +13,7 @@ final class TextClipboard {
     private final Consumer<String> remote;
     private final ByteArrayOutputStream fragments = new ByteArrayOutputStream();
     private String local = "";
+    private final java.util.ArrayDeque<java.util.concurrent.CompletableFuture<Void>> announcements = new java.util.ArrayDeque<>();
     private int expected;
 
     TextClipboard(Sender sender, Consumer<String> remote) {
@@ -20,10 +21,13 @@ final class TextClipboard {
         this.remote = remote;
     }
 
-    synchronized void offer(String text) throws IOException {
+    synchronized java.util.concurrent.CompletableFuture<Void> offer(String text) throws IOException {
         if (text.length() > LIMIT / 4 - 8) throw new IOException("Clipboard text too large");
         local = text;
+        var acknowledged = new java.util.concurrent.CompletableFuture<Void>();
+        announcements.add(acknowledged);
         send(2, 0, buffer(36).putInt(13).array());
+        return acknowledged;
     }
 
     synchronized void receive(byte[] chunk) throws IOException {
@@ -48,6 +52,7 @@ final class TextClipboard {
             case 1 -> {
                 send(7, 0, buffer(16).putShort((short) 1).putShort((short) 0).putShort((short) 1)
                         .putShort((short) 12).putInt(2).putInt(0).array());
+                announcements.add(new java.util.concurrent.CompletableFuture<>());
                 send(2, 0, new byte[0]);
             }
             case 2 -> {
@@ -59,6 +64,13 @@ final class TextClipboard {
                 if (message.hasRemaining()) throw new IOException("Invalid clipboard format list");
                 send(3, 1, new byte[0]);
                 if (unicode) send(4, 0, buffer(4).putInt(13).array());
+            }
+            case 3 -> {
+                var pending = announcements.poll();
+                if (pending != null) {
+                    if (result == 1) pending.complete(null);
+                    else pending.completeExceptionally(new IOException("Server rejected clipboard text"));
+                }
             }
             case 4 -> {
                 if (message.remaining() == 4 && message.getInt() == 13) {

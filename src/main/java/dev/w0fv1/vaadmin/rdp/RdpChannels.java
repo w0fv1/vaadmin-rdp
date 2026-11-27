@@ -165,6 +165,3 @@ final class RdpChannels {
         return body;
     }
 }
-
-
-
