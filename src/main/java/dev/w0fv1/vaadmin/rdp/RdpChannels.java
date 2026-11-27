@@ -99,6 +99,48 @@ final class RdpChannels {
         }
     }
 
+    int userId() { return initiator + 1001; }
+    int global() { return global; }
+    int clipboard() { return clipboard; }
+
+    synchronized void send(int channel, byte[] payload) throws IOException {
+        if (payload.length > 32767) throw new IOException("MCS segment exceeds negotiated length");
+        var data = new ByteArrayOutputStream();
+        var header = new DataOutputStream(data);
+        header.writeByte(0x64);
+        header.writeShort(initiator);
+        header.writeShort(channel);
+        header.writeByte(0x70);
+        if (payload.length < 128) header.writeByte(payload.length);
+        else header.writeShort(0x8000 | payload.length);
+        header.write(payload);
+        write(data.toByteArray());
+    }
+
+    record Message(int channel, byte[] payload) {}
+
+    Message receive() throws IOException {
+        int first = input.readUnsignedByte();
+        if (first != 3) {
+            if ((first & 0xc3) != 0) throw new IOException("Unsupported fast-path header");
+            int length = input.readUnsignedByte();
+            int header = 2;
+            if ((length & 128) != 0) { length = ((length & 127) << 8) | input.readUnsignedByte(); header++; }
+            if (length < header) throw new IOException("Invalid fast-path packet length");
+            byte[] payload = new byte[length - header];
+            input.readFully(payload);
+            return new Message(0, payload);
+        }
+        var data = new DataInputStream(new ByteArrayInputStream(readTpktBody()));
+        if (data.readUnsignedByte() != 0x68) throw new IOException("Expected MCS send-data indication");
+        data.readUnsignedShort();
+        int channel = data.readUnsignedShort();
+        data.readUnsignedByte();
+        int length = data.readUnsignedByte();
+        if ((length & 128) != 0) length = ((length & 127) << 8) | data.readUnsignedByte();
+        if (length != data.available()) throw new IOException("Invalid MCS segment length");
+        return new Message(channel, data.readNBytes(length));
+    }
     void write(byte[] body) throws IOException {
         output.writeShort(0x0300);
         output.writeShort(body.length + 7);
@@ -108,7 +150,12 @@ final class RdpChannels {
     }
 
     byte[] read() throws IOException {
-        if (input.readUnsignedShort() != 0x0300) throw new IOException("Expected TPKT data");
+        if (input.readUnsignedByte() != 3) throw new IOException("Expected TPKT data");
+        return readTpktBody();
+    }
+
+    private byte[] readTpktBody() throws IOException {
+        if (input.readUnsignedByte() != 0) throw new IOException("Invalid TPKT header");
         int length = input.readUnsignedShort();
         if (length < 7 || input.readUnsignedByte() != 2 || input.readUnsignedShort() != 0xf080) {
             throw new IOException("Invalid X.224 data packet");
@@ -118,4 +165,6 @@ final class RdpChannels {
         return body;
     }
 }
+
+
 
