@@ -14,10 +14,12 @@ class VaadminRdpViewer extends HTMLElement {
     this.status = root.querySelector('[role=status]');
     this.buttons = [...root.querySelectorAll('button')];
     this.buttons[0].onclick = async () => {
+      this.setStatus("正在复制远端文本");
       try { await navigator.clipboard.writeText(this.remoteText); this.canvas.focus({preventScroll:true}); this.setStatus("已复制到本机剪贴板"); }
       catch { this.setStatus('浏览器未允许写入剪贴板'); }
     };
     this.buttons[1].onclick = async () => {
+      this.setStatus("正在更新远端剪贴板");
       try {
         await this.$server.offerText(await navigator.clipboard.readText());
         this.canvas.focus({preventScroll:true});
